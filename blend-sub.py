@@ -23,7 +23,6 @@ bpy.types.Scene.sub_file = 'English'
 
 global strips, adding_sub, current_strip, framerate
 
-framerate = 24 #bpy.context.scene.render.fps
 adding_sub = False
 
 ''' ------------------------------------------------------------------------------'''
@@ -92,13 +91,11 @@ def update_caption_list():
 	List = text.splitlines()
 
 def exists(obj):
-	file_exists = False
-	for ob in bpy.context.screen.scene.objects:
-		if ob.name == obj:
-			file_exists = True
-			break
+	if obj in bpy.context.screen.scene.objects : return True
+	else : return False
 
 def timecode(frame):
+	framerate = bpy.context.scene.render.fps
 	tc = '{0:02d}:{1:02d}:{2:02d}:{3:02d}'.format(int(frame / (3600*framerate)),
 													int(frame / (60*framerate) % 60),
 													int(frame / framerate % 60),
@@ -136,7 +133,7 @@ def setup():
 		bpy.ops.sequencer.select_all(action = "DESELECT")
 		end = bpy.context.scene.frame_end
 		res_y = bpy.data.scenes[0].render.resolution_y
-		offset = res_y - (res_y//6)
+		offset = res_y - (res_y//7)
 		bpy.ops.sequencer.effect_strip_add(frame_start=1, frame_end=end, channel=3, type='COLOR')
 		mask = bpy.context.scene.sequence_editor.active_strip
 		mask.name = 'mask'
@@ -150,7 +147,7 @@ def setup():
 		bpy.ops.sequencer.scene_strip_add(frame_start=1, channel=4, scene=scene)
 		s = bpy.context.scene.sequence_editor.active_strip
 		s.blend_type = 'ALPHA_OVER'
-		
+
 	bpy.context.area.type = original_type
 
 
@@ -173,8 +170,8 @@ def update_sub():
 		bpy.data.objects['current'].data.body = new
 		bpy.data.objects['next'].data.body = next
 	frame = bpy.context.scene.frame_current
-	bpy.data.objects['tc'].data.body = timecode(frame)
-		#bpy.ops.sequencer.refresh_all()
+	if exists('tc') :
+		bpy.data.objects['tc'].data.body = timecode(frame)
 
 def new_sub_strip(start):
 	global current_strip, adding_sub
@@ -184,23 +181,23 @@ def new_sub_strip(start):
 	current_strip.blend_alpha = 0
 	if bpy.context.screen.scene.snap == True:
 		current_strip.frame_final_start = snap_to(start,'start')
-	adding_sub = True
-	return
+	return True
 
 def end_strip(frame):
 	global current_strip, adding_sub
 	current_strip.frame_final_end = frame - 1
-	adding_sub = False
 	if bpy.context.screen.scene.snap == True:
 			current_strip.frame_final_end = snap_to(frame,'start')
 	current_strip = None
+	return True
 
 # Everything that needs to be done when the frame changes
 def main(self):
 	global adding_sub, current_strip
-	update_sub()
-	if adding_sub:
-		current_strip.frame_final_end = bpy.context.scene.frame_current + 1
+	if exists('current') and exists('next') :
+		update_sub()
+		if adding_sub:
+			current_strip.frame_final_end = bpy.context.scene.frame_current + 1
 
 ''' ------------------------------------------------------------------------------'''
 '''								 INTERFACE									 '''
@@ -237,7 +234,7 @@ class OBJECT_OT_Insert_start(bpy.types.Operator):
 	bl_label = "Add"
 	bl_idname = "sequencer.sub_start"
 	bl_description = "start"
-		
+
 	def invoke(self, context, event):
 		global adding_sub, current_strip
 		original_type = bpy.context.area.type
@@ -245,7 +242,7 @@ class OBJECT_OT_Insert_start(bpy.types.Operator):
 		frame = bpy.context.scene.frame_current
 		if adding_sub:
 			end_strip(frame)
-		new_sub_strip(frame)
+		adding_sub = new_sub_strip(frame)
 		strip_list()
 		bpy.context.area.type = original_type
 		return {'FINISHED'}
@@ -261,7 +258,7 @@ class OBJECT_OT_Insert_end(bpy.types.Operator):
 		bpy.context.area.type = "SEQUENCE_EDITOR"
 		frame = bpy.context.scene.frame_current
 		if adding_sub:
-			end_strip(frame)
+			if end_strip(frame) : adding_sub = False
 		bpy.context.area.type = original_type
 		return {'FINISHED'}
 
