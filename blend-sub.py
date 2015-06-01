@@ -19,8 +19,7 @@ from bpy.app.handlers import persistent
 
 bpy.types.Scene.snap = bpy.props.BoolProperty(name="Snap",description="Snap markers to the highest sound level around",default = False)
 bpy.types.Scene.sub_file = bpy.props.StringProperty(name="Caption_file_name")
-bpy.types.Scene.sub_file = 'English'
-
+bpy.types.Scene.sub_file = ''
 global strips, adding_sub, current_strip, framerate
 
 adding_sub = False
@@ -60,8 +59,8 @@ def refresh():
 def snap_to(frame, type):
 	vu = bpy.data.objects['vu']
 	temp = []
-	x = int(framerate)
-	range_from = frame - x
+	framerate = bpy.context.scene.render.fps
+	range_from = frame - framerate
 	for f in range(range_from,frame):
 		try : temp.append([vu.animation_data.action.fcurves[1].evaluate(f),f])
 		except : pass
@@ -85,10 +84,12 @@ def strip_list():
 
 def update_caption_list():
 	global List
-	try: the_file = str(bpy.types.Scene.sub_file)
-	except: the_file = ''
-	text = bpy.data.texts[the_file].as_string()
-	List = text.splitlines()
+	if len(str(bpy.types.Scene.sub_file)) > 1 :
+		try: the_file = str(bpy.types.Scene.sub_file)
+		except: the_file = ''
+		text = bpy.data.texts[the_file].as_string()
+		List = text.splitlines()
+	else : List = []
 
 def exists(obj):
 	if obj in bpy.context.screen.scene.objects : return True
@@ -167,8 +168,8 @@ def update_sub():
 	current = bpy.data.objects['current'].data.body
 	new, next = find_sub()
 	if current != new :
-		bpy.data.objects['current'].data.body = new
-		bpy.data.objects['next'].data.body = next
+		if exists('current') : bpy.data.objects['current'].data.body = new
+		if exists('next') : bpy.data.objects['next'].data.body = next
 	frame = bpy.context.scene.frame_current
 	if exists('tc') :
 		bpy.data.objects['tc'].data.body = timecode(frame)
@@ -194,7 +195,7 @@ def end_strip(frame):
 # Everything that needs to be done when the frame changes
 def main(self):
 	global adding_sub, current_strip
-	if exists('current') and exists('next') :
+	if len(str(bpy.types.Scene.sub_file)) > 1 :
 		update_sub()
 		if adding_sub:
 			current_strip.frame_final_end = bpy.context.scene.frame_current + 1
@@ -237,14 +238,15 @@ class OBJECT_OT_Insert_start(bpy.types.Operator):
 
 	def invoke(self, context, event):
 		global adding_sub, current_strip
-		original_type = bpy.context.area.type
-		bpy.context.area.type = "SEQUENCE_EDITOR"
-		frame = bpy.context.scene.frame_current
-		if adding_sub:
-			end_strip(frame)
-		adding_sub = new_sub_strip(frame)
-		strip_list()
-		bpy.context.area.type = original_type
+		if len(str(bpy.types.Scene.sub_file)) > 1 :
+			original_type = bpy.context.area.type
+			bpy.context.area.type = "SEQUENCE_EDITOR"
+			frame = bpy.context.scene.frame_current
+			if adding_sub:
+				end_strip(frame)
+			adding_sub = new_sub_strip(frame)
+			strip_list()
+			bpy.context.area.type = original_type
 		return {'FINISHED'}
 		
 class OBJECT_OT_Insert_end(bpy.types.Operator):  
@@ -254,12 +256,13 @@ class OBJECT_OT_Insert_end(bpy.types.Operator):
 		
 	def invoke(self, context, event):
 		global adding_sub, current_strip
-		original_type = bpy.context.area.type
-		bpy.context.area.type = "SEQUENCE_EDITOR"
-		frame = bpy.context.scene.frame_current
-		if adding_sub:
-			if end_strip(frame) : adding_sub = False
-		bpy.context.area.type = original_type
+		if len(str(bpy.types.Scene.sub_file)) > 1 :
+			original_type = bpy.context.area.type
+			bpy.context.area.type = "SEQUENCE_EDITOR"
+			frame = bpy.context.scene.frame_current
+			if adding_sub:
+				if end_strip(frame) : adding_sub = False
+			bpy.context.area.type = original_type
 		return {'FINISHED'}
 
 class Sub_Chooser(bpy.types.Operator):
