@@ -97,7 +97,7 @@ def exists(obj):
 
 def timecode(frame):
 	framerate = bpy.context.scene.render.fps
-	tc = '{0:02d}:{1:02d}:{2:02d}:{3:02d}'.format(int(frame / (3600*framerate)),
+	tc = '{0:02d}:{1:02d}:{2:02d},{3:02d}'.format(int(frame / (3600*framerate)),
 													int(frame / (60*framerate) % 60),
 													int(frame / framerate % 60),
 													int(frame % framerate))
@@ -148,18 +148,18 @@ def setup():
 		bpy.ops.sequencer.scene_strip_add(frame_start=1, channel=4, scene=scene)
 		s = bpy.context.scene.sequence_editor.active_strip
 		s.blend_type = 'ALPHA_OVER'
-
+		
+	refresh()
 	bpy.context.area.type = original_type
 
 
 def find_sub():
-	global strips
+	global strips, List
 	frame = bpy.context.scene.frame_current
 	for i, t in enumerate(strips):
 		if frame > t.frame_final_start and frame < t.frame_final_end:
 			new = t.name
-			try: next = strips[i+1].name
-			except:	next = ''
+			next = List[i+1]
 			return new, next
 	return '',''
 	
@@ -168,8 +168,8 @@ def update_sub():
 	current = bpy.data.objects['current'].data.body
 	new, next = find_sub()
 	if current != new :
-		if exists('current') : bpy.data.objects['current'].data.body = new
-		if exists('next') : bpy.data.objects['next'].data.body = next
+		if exists('current') : bpy.data.objects['current'].data.body = clean(new,'/')
+		if exists('next') : bpy.data.objects['next'].data.body = clean(next,'/')
 	frame = bpy.context.scene.frame_current
 	if exists('tc') :
 		bpy.data.objects['tc'].data.body = timecode(frame)
@@ -192,13 +192,23 @@ def end_strip(frame):
 	current_strip = None
 	return True
 
+def clean(str,x):
+	return str.replace(x, '\n')
+
+def sub_to_file():
+		sub_text = bpy.data.texts.new(bpy.types.Scene.sub_file + '.srt')
+		for i,l in enumerate(strips):
+			sub_text.write(str(i+1) + '\n' + timecode(l.frame_final_start) + ' --> ' + timecode(l.frame_final_end) + '\n' + l.name + '\n\n')
+
+
 # Everything that needs to be done when the frame changes
 def main(self):
 	global adding_sub, current_strip
-	if len(str(bpy.types.Scene.sub_file)) > 1 :
-		update_sub()
-		if adding_sub:
-			current_strip.frame_final_end = bpy.context.scene.frame_current + 1
+	
+	if adding_sub:
+		current_strip.frame_final_end = bpy.context.scene.frame_current + 10
+	update_sub()
+	
 
 ''' ------------------------------------------------------------------------------'''
 '''								 INTERFACE									 '''
@@ -286,8 +296,9 @@ class Sub_Chooser_Menu(bpy.types.Menu):
 	def draw(self, context):
 		layout = self.layout
 		for txt in bpy.data.texts:
-			props = layout.operator("object.menu", text=txt.name)
-			props.text_name = txt.name
+			if '.fab' not in txt.name and '.py' not in txt.name :
+				props = layout.operator("object.menu", text=txt.name)
+				props.text_name = txt.name
 			
 def draw_item(self, context):
 	layout = self.layout
