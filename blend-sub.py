@@ -346,7 +346,7 @@ class iop_panel(bpy.types.Header):
 		row.prop(context.scene,"lock")
 
 def register():
-	bpy.app.handlers.frame_change_post.append(main)
+	bpy.app.handlers.frame_change_pre.append(main)
 	bpy.utils.register_class(iop_panel)
 	bpy.utils.register_class(OBJECT_OT_Insert_start)
 	bpy.utils.register_class(OBJECT_OT_Insert_end)
@@ -359,7 +359,7 @@ def register():
 	bpy.types.INFO_HT_header.append(draw_item)
 	
 def unregister():
-	bpy.app.handlers.frame_change_post.remove(main)
+	bpy.app.handlers.frame_change_pre.remove(main)
 	bpy.utils.unregister_class(iop_panel)
 	bpy.utils.unregister_class(OBJECT_OT_Insert_start)
 	bpy.utils.unregister_class(OBJECT_OT_Insert_end)
