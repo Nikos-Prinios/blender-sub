@@ -17,12 +17,14 @@ bl_info = {
 import bpy, random
 from bpy.app.handlers import persistent
 
-bpy.types.Scene.snap = bpy.props.BoolProperty(name="Snap",description="Snap markers to the highest sound level around",default = False)
+bpy.types.Scene.snap = bpy.props.BoolProperty(name="Snap",description="Snap subtitles to the highest sound level around",default = False)
+bpy.types.Scene.lock = bpy.props.BoolProperty(name="Lock",description="Lock for rendering subtitles",default = False)
 bpy.types.Scene.sub_file = bpy.props.StringProperty(name="Caption_file_name")
 bpy.types.Scene.sub_file = ''
-global strips, adding_sub, current_strip, framerate
+global strips, adding_sub, current_strip, framerate, current_scene
 
 adding_sub = False
+current_scene = '' # will be initialized later for safety
 
 ''' ------------------------------------------------------------------------------'''
 '''								 FUNCTIONS									 '''
@@ -92,7 +94,8 @@ def update_caption_list():
 	else : List = []
 
 def exists(obj):
-	if obj in bpy.context.screen.scene.objects : return True
+	global current_scene
+	if obj in current_scene.objects : return True
 	else : return False
 
 def timecode(frame):
@@ -104,6 +107,7 @@ def timecode(frame):
 	return tc
 
 def setup():
+	global current_scene
 	original_type = bpy.context.area.type
 	bpy.context.area.type = "SEQUENCE_EDITOR"	 
 	for s in bpy.context.scene.sequence_editor.sequences:
@@ -114,7 +118,7 @@ def setup():
 			rnd.resolution_x = x
 			rnd.resolution_y = y
 			bpy.ops.screen.frame_jump(end=False)
-			bpy.context.screen.scene.frame_end = s.frame_final_end
+			current_scene.frame_end = s.frame_final_end
 
 		if s.type == 'SOUND':
 			bpy.context.scene.sequence_editor.active_strip = s
@@ -153,9 +157,8 @@ def setup():
 	bpy.context.area.type = original_type
 
 
-def find_sub():
+def find_sub(frame):
 	global strips, List
-	frame = bpy.context.scene.frame_current
 	for i, t in enumerate(strips):
 		if frame > t.frame_final_start and frame < t.frame_final_end:
 			new = t.name
@@ -163,31 +166,32 @@ def find_sub():
 			return new, next
 	return '',''
 	
-def update_sub():
-	strip_list()
+def update_sub(frame):
+	global current_scene
+	if current_scene.lock == False:
+		strip_list()
 	current = bpy.data.objects['current'].data.body
-	new, next = find_sub()
+	new, next = find_sub(frame)
 	if current != new :
 		if exists('current') : bpy.data.objects['current'].data.body = clean(new,'/')
-		if exists('next') : bpy.data.objects['next'].data.body = clean(next,'/')
-	frame = bpy.context.scene.frame_current
-	if exists('tc') :
+		if exists('next') and current_scene.lock == False : bpy.data.objects['next'].data.body = clean(next,'/')
+	if exists('tc') and current_scene.lock == False :
 		bpy.data.objects['tc'].data.body = timecode(frame)
 
 def new_sub_strip(start):
-	global current_strip, adding_sub
+	global current_strip, adding_sub, current_scene
 	seq = bpy.ops.sequencer
 	seq.effect_strip_add(frame_start=start, frame_end=start+1, type='COLOR', color=(random.uniform(0.5,1),random.uniform(0.5,1),1), overlap=False)
 	current_strip = bpy.context.scene.sequence_editor.active_strip
 	current_strip.blend_alpha = 0
-	if bpy.context.screen.scene.snap == True:
+	if current_scene.snap == True:
 		current_strip.frame_final_start = snap_to(start,'start')
 	return True
 
 def end_strip(frame):
-	global current_strip, adding_sub
+	global current_strip, adding_sub, current_scene
 	current_strip.frame_final_end = frame - 1
-	if bpy.context.screen.scene.snap == True:
+	if current_scene.snap == True:
 			current_strip.frame_final_end = snap_to(frame,'start')
 	current_strip = None
 	return True
@@ -204,10 +208,10 @@ def sub_to_file():
 # Everything that needs to be done when the frame changes
 def main(self):
 	global adding_sub, current_strip
-	
+	frame = bpy.context.scene.frame_current
 	if adding_sub:
 		current_strip.frame_final_end = bpy.context.scene.frame_current + 10
-	update_sub()
+	update_sub(frame)
 	
 
 ''' ------------------------------------------------------------------------------'''
@@ -294,6 +298,10 @@ class Sub_Chooser_Menu(bpy.types.Menu):
 	bl_idname = "OBJECT_MT_sub_chooser"
 
 	def draw(self, context):
+		# initialize the current_scene here
+		global current_scene
+		current_scene = bpy.context.screen.scene
+		#
 		layout = self.layout
 		for txt in bpy.data.texts:
 			if '.fab' not in txt.name and '.py' not in txt.name :
@@ -323,7 +331,6 @@ class iop_panel(bpy.types.Header):
 	bl_space_type = "SEQUENCE_EDITOR"	   
 	bl_region_type = "UI"		  
 	bl_label = "subtitles"
-	global main_scene
 	
 	@classmethod
 	def poll(self, context):
@@ -336,6 +343,7 @@ class iop_panel(bpy.types.Header):
 		row.operator("sequencer.sub_start", icon="TRIA_RIGHT")
 		row.operator("sequencer.sub_end", icon="TRIA_LEFT")
 		row.prop(context.scene,"snap")
+		row.prop(context.scene,"lock")
 
 def register():
 	bpy.app.handlers.frame_change_post.append(main)
