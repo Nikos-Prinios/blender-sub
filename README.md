@@ -1,2 +1,5 @@
 # blender-sub
-coming soon
+
+see : https://www.youtube.com/watch?v=rHjGF1g5gh8
+
+
