@@ -37,7 +37,7 @@ def refresh():
 	bpy.context.area.type = "SEQUENCE_EDITOR"
 	for s in bpy.context.scene.sequence_editor.sequences:
 		if s.type == 'SOUND':
-			path = bpy.path.abspath(s.filepath) 
+			path = bpy.path.abspath(s.sound.filepath) 
 			pass
 	if exists('vu') and path != '' :
 		bpy.context.area.type = "VIEW_3D";
@@ -118,7 +118,7 @@ def setup():
 			rnd.resolution_x = x
 			rnd.resolution_y = y
 			bpy.ops.screen.frame_jump(end=False)
-			current_scene.frame_end = s.frame_final_end
+			#current_scene.frame_end = s.frame_final_end
 
 		if s.type == 'SOUND':
 			bpy.context.scene.sequence_editor.active_strip = s
